@@ -6,9 +6,6 @@ from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
 import io
 
-urlretrieve("http://corporatecafeboston.com/linked/woburn.pdf", "woburn.pdf")
-text = convert_pdf_to_txt("download.pdf")
-
 def convert_pdf_to_txt(path):
     rsrcmgr = PDFResourceManager()
     retstr = io.StringIO()
@@ -34,3 +31,8 @@ def convert_pdf_to_txt(path):
     device.close()
     retstr.close()
     return text
+
+
+urlretrieve("http://corporatecafeboston.com/linked/woburn.pdf", "download.pdf")
+text = convert_pdf_to_txt("download.pdf")
+print(text)
