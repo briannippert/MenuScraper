@@ -4,7 +4,7 @@ from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
-
+import io
 
 urlretrieve("http://corporatecafeboston.com/linked/woburn.pdf", "woburn.pdf")
 text = convert_pdf_to_txt("download.pdf")
