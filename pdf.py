@@ -47,8 +47,11 @@ except:
     my_date = date.today()
     date = calendar.day_name[my_date.weekday()]
     print(date)
-results = re.findall( r'Wednesday[\w\W]+?Sandwich:  (.*)?\n',text)
-print(results[0])
+results = re.findall( r'{0}[\w\W]+?Sandwich:  (.*)?\n'.format(date),text)
+if results:
+    print(results[0])
+else:
+    print("No matches found")
 
 
 
