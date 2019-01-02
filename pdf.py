@@ -5,6 +5,11 @@ from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
 import io
+import sys
+from datetime import date
+import calendar
+
+
 
 def convert_pdf_to_txt(path):
     rsrcmgr = PDFResourceManager()
@@ -35,4 +40,16 @@ def convert_pdf_to_txt(path):
 
 urlretrieve("http://corporatecafeboston.com/linked/woburn.pdf", "download.pdf")
 text = convert_pdf_to_txt("download.pdf")
-print(text)
+try:
+    date = sys.argv[1]
+    print(date)
+except:
+    my_date = date.today()
+    date = calendar.day_name[my_date.weekday()]
+    print(date)
+results = re.match( r'{}[\w\W]+?Sandwich:  (.*)?\n'.format(date),text)
+results.group(1)
+
+
+
+
