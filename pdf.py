@@ -48,6 +48,7 @@ except:
     date = calendar.day_name[my_date.weekday()]
     print(date)
 results = re.match( r'{}[\w\W]+?Sandwich:  (.*)?\n'.format(date),text)
+print(results)
 results.group(1)
 
 
