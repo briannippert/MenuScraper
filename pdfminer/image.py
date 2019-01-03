@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 import struct
 import os
 import os.path
@@ -34,9 +34,9 @@ class BMPWriter(object):
         self.datasize = self.linesize * self.height
         headersize = 14+40+ncols*4
         info = struct.pack('<IiiHHIIIIII', 40, self.width, self.height, 1, self.bits, 0, self.datasize, 0, 0, ncols, 0)
-        assert len(info) == 40, str(len(info))
+        assert len(info) == 40, len(info)
         header = struct.pack('<ccIHHI', b'B', b'M', headersize+self.datasize, 0, 0, headersize)
-        assert len(header) == 14, str(len(header))
+        assert len(header) == 14, len(header)
         self.fp.write(header)
         self.fp.write(info)
         if ncols == 2:
@@ -80,7 +80,7 @@ class ImageWriter(object):
             ext = '.%d.%dx%d.img' % (image.bits, width, height)
         name = image.name+ext
         path = os.path.join(self.outdir, name)
-        fp=open(path, 'wb')
+        fp = file(path, 'wb')
         if ext == '.jpg':
             raw_data = stream.get_rawdata()
             if LITERAL_DEVICE_CMYK in image.colorspace:

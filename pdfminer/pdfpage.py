@@ -1,6 +1,5 @@
-
+#!/usr/bin/env python
 import logging
-from . import settings
 from .psparser import LIT
 from .pdftypes import PDFObjectNotFound
 from .pdftypes import resolve1
@@ -11,9 +10,7 @@ from .pdfparser import PDFParser
 from .pdfdocument import PDFDocument
 from .pdfdocument import PDFTextExtractionNotAllowed
 
-import six  # Python 2+3 compatibility
-
-log = logging.getLogger(__name__)
+import six # Python 2+3 compatibility
 
 # some predefined literals and keywords.
 LITERAL_PAGE = LIT('Page')
@@ -89,18 +86,13 @@ class PDFPage(object):
             for (k, v) in six.iteritems(parent):
                 if k in klass.INHERITABLE_ATTRS and k not in tree:
                     tree[k] = v
-
-            tree_type = tree.get('Type')
-            if tree_type is None and not settings.STRICT:  # See #64
-                tree_type = tree.get('type')
-
-            if tree_type is LITERAL_PAGES and 'Kids' in tree:
-                log.info('Pages: Kids=%r', tree['Kids'])
+            if tree.get('Type') is LITERAL_PAGES and 'Kids' in tree:
+                logging.info('Pages: Kids=%r', tree['Kids'])
                 for c in list_value(tree['Kids']):
                     for x in search(c, tree):
                         yield x
-            elif tree_type is LITERAL_PAGE:
-                log.info('Page: %r', tree)
+            elif tree.get('Type') is LITERAL_PAGE:
+                logging.info('Page: %r', tree)
                 yield (objid, tree)
         pages = False
         if 'Pages' in document.catalog:

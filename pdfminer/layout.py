@@ -1,9 +1,9 @@
-from sortedcontainers import SortedListWithKey
-
+#!/usr/bin/env python
 from .utils import INF
 from .utils import Plane
 from .utils import get_bound
 from .utils import uniq
+from .utils import csort
 from .utils import fsplit
 from .utils import bbox2str
 from .utils import matrix2str
@@ -114,36 +114,36 @@ class LTComponent(LTItem):
         return self.width <= 0 or self.height <= 0
 
     def is_hoverlap(self, obj):
-        assert isinstance(obj, LTComponent), str(type(obj))
+        assert isinstance(obj, LTComponent)
         return obj.x0 <= self.x1 and self.x0 <= obj.x1
 
     def hdistance(self, obj):
-        assert isinstance(obj, LTComponent), str(type(obj))
+        assert isinstance(obj, LTComponent)
         if self.is_hoverlap(obj):
             return 0
         else:
             return min(abs(self.x0-obj.x1), abs(self.x1-obj.x0))
 
     def hoverlap(self, obj):
-        assert isinstance(obj, LTComponent), str(type(obj))
+        assert isinstance(obj, LTComponent)
         if self.is_hoverlap(obj):
             return min(abs(self.x0-obj.x1), abs(self.x1-obj.x0))
         else:
             return 0
 
     def is_voverlap(self, obj):
-        assert isinstance(obj, LTComponent), str(type(obj))
+        assert isinstance(obj, LTComponent)
         return obj.y0 <= self.y1 and self.y0 <= obj.y1
 
     def vdistance(self, obj):
-        assert isinstance(obj, LTComponent), str(type(obj))
+        assert isinstance(obj, LTComponent)
         if self.is_voverlap(obj):
             return 0
         else:
             return min(abs(self.y0-obj.y1), abs(self.y1-obj.y0))
 
     def voverlap(self, obj):
-        assert isinstance(obj, LTComponent), str(type(obj))
+        assert isinstance(obj, LTComponent)
         if self.is_voverlap(obj):
             return min(abs(self.y0-obj.y1), abs(self.y1-obj.y0))
         else:
@@ -154,15 +154,10 @@ class LTComponent(LTItem):
 ##
 class LTCurve(LTComponent):
 
-    def __init__(self, linewidth, pts, stroke = False, fill = False, evenodd = False, stroking_color = None, non_stroking_color = None):
+    def __init__(self, linewidth, pts):
         LTComponent.__init__(self, get_bound(pts))
         self.pts = pts
         self.linewidth = linewidth
-        self.stroke = stroke
-        self.fill = fill
-        self.evenodd = evenodd
-        self.stroking_color = stroking_color
-        self.non_stroking_color = non_stroking_color
         return
 
     def get_pts(self):
@@ -173,8 +168,8 @@ class LTCurve(LTComponent):
 ##
 class LTLine(LTCurve):
 
-    def __init__(self, linewidth, p0, p1, stroke = False, fill = False, evenodd = False, stroking_color = None, non_stroking_color = None):
-        LTCurve.__init__(self, linewidth, [p0, p1], stroke, fill, evenodd, stroking_color, non_stroking_color)
+    def __init__(self, linewidth, p0, p1):
+        LTCurve.__init__(self, linewidth, [p0, p1])
         return
 
 
@@ -182,9 +177,9 @@ class LTLine(LTCurve):
 ##
 class LTRect(LTCurve):
 
-    def __init__(self, linewidth, bbox, stroke = False, fill = False, evenodd = False, stroking_color = None, non_stroking_color = None):
+    def __init__(self, linewidth, bbox):
         (x0, y0, x1, y1) = bbox
-        LTCurve.__init__(self, linewidth, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], stroke, fill, evenodd, stroking_color, non_stroking_color)
+        LTCurve.__init__(self, linewidth, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
         return
 
 
@@ -228,13 +223,11 @@ class LTAnno(LTItem, LTText):
 class LTChar(LTComponent, LTText):
 
     def __init__(self, matrix, font, fontsize, scaling, rise,
-                 text, textwidth, textdisp, ncs, graphicstate):
+                 text, textwidth, textdisp):
         LTText.__init__(self)
         self._text = text
         self.matrix = matrix
         self.fontname = font.fontname
-        self.ncs = ncs
-        self.graphicstate = graphicstate
         self.adv = textwidth * fontsize * scaling
         # compute the boundary rectangle.
         if font.is_vertical():
@@ -441,7 +434,7 @@ class LTTextBoxHorizontal(LTTextBox):
 
     def analyze(self, laparams):
         LTTextBox.analyze(self, laparams)
-        self._objs.sort(key=lambda obj: -obj.y1)
+        self._objs = csort(self._objs, key=lambda obj: -obj.y1)
         return
 
     def get_writing_mode(self):
@@ -452,7 +445,7 @@ class LTTextBoxVertical(LTTextBox):
 
     def analyze(self, laparams):
         LTTextBox.analyze(self, laparams)
-        self._objs.sort(key=lambda obj: -obj.x1)
+        self._objs = csort(self._objs, key=lambda obj: -obj.x1)
         return
 
     def get_writing_mode(self):
@@ -474,7 +467,7 @@ class LTTextGroupLRTB(LTTextGroup):
     def analyze(self, laparams):
         LTTextGroup.analyze(self, laparams)
         # reorder the objects from top-left to bottom-right.
-        self._objs.sort(key=lambda obj:
+        self._objs = csort(self._objs, key=lambda obj:
                            (1-laparams.boxes_flow)*(obj.x0) -
                            (1+laparams.boxes_flow)*(obj.y0+obj.y1))
         return
@@ -485,7 +478,7 @@ class LTTextGroupTBRL(LTTextGroup):
     def analyze(self, laparams):
         LTTextGroup.analyze(self, laparams)
         # reorder the objects from top-right to bottom-left.
-        self._objs.sort(key=lambda obj:
+        self._objs = csort(self._objs, key=lambda obj:
                            -(1+laparams.boxes_flow)*(obj.x0+obj.x1)
                            - (1-laparams.boxes_flow)*(obj.y1))
         return
@@ -522,7 +515,7 @@ class LTLayoutContainer(LTContainer):
                            obj0.voverlap(obj1)) and
                           (obj0.hdistance(obj1) <
                            max(obj0.width, obj1.width) * laparams.char_margin))
-
+                
                 # valign: obj0 and obj1 is vertically aligned.
                 #
                 #   +------+
@@ -544,7 +537,7 @@ class LTLayoutContainer(LTContainer):
                            obj0.hoverlap(obj1)) and
                           (obj0.vdistance(obj1) <
                            max(obj0.height, obj1.height) * laparams.char_margin))
-
+                
                 if ((halign and isinstance(line, LTTextLineHorizontal)) or
                     (valign and isinstance(line, LTTextLineVertical))):
                     line.add(obj1)
@@ -605,7 +598,7 @@ class LTLayoutContainer(LTContainer):
 
     # group_textboxes: group textboxes hierarchically.
     def group_textboxes(self, laparams, boxes):
-        assert boxes, str((laparams, boxes))
+        assert boxes
 
         def dist(obj1, obj2):
             """A distance function between two TextBoxes.
@@ -638,19 +631,22 @@ class LTLayoutContainer(LTContainer):
         def key_obj(t):
             (c,d,_,_) = t
             return (c,d)
-
-        dists = SortedListWithKey(key=key_obj)
+        
+        # XXX this still takes O(n^2)  :(
+        dists = []
         for i in range(len(boxes)):
             obj1 = boxes[i]
             for j in range(i+1, len(boxes)):
                 obj2 = boxes[j]
-                dists.add((0, dist(obj1, obj2), obj1, obj2))
+                dists.append((0, dist(obj1, obj2), obj1, obj2))
+        # We could use dists.sort(), but it would randomize the test result.
+        dists = csort(dists, key=key_obj)
         plane = Plane(self.bbox)
         plane.extend(boxes)
         while dists:
             (c, d, obj1, obj2) = dists.pop(0)
             if c == 0 and isany(obj1, obj2):
-                dists.add((1, d, obj1, obj2))
+                dists.append((1, d, obj1, obj2))
                 continue
             if (isinstance(obj1, (LTTextBoxVertical, LTTextGroupTBRL)) or
                 isinstance(obj2, (LTTextBoxVertical, LTTextGroupTBRL))):
@@ -659,15 +655,13 @@ class LTLayoutContainer(LTContainer):
                 group = LTTextGroupLRTB([obj1, obj2])
             plane.remove(obj1)
             plane.remove(obj2)
-            removed = [obj1, obj2]
-            to_remove = [ (c,d,obj1,obj2) for (c,d,obj1,obj2) in dists
-                      if (obj1 in removed or obj2 in removed) ]
-            for r in to_remove:
-                dists.remove(r)
+            dists = [ (c,d,obj1,obj2) for (c,d,obj1,obj2) in dists
+                      if (obj1 in plane and obj2 in plane) ]
             for other in plane:
-                dists.add((0, dist(group, other), group, other))
+                dists.append((0, dist(group, other), group, other))
+            dists = csort(dists, key=key_obj)
             plane.add(group)
-        assert len(plane) == 1, str(len(plane))
+        assert len(plane) == 1
         return list(plane)
 
     def analyze(self, laparams):
@@ -683,20 +677,13 @@ class LTLayoutContainer(LTContainer):
         for obj in empties:
             obj.analyze(laparams)
         textboxes = list(self.group_textlines(laparams, textlines))
-        if -1 <= laparams.boxes_flow and laparams.boxes_flow <= +1 and textboxes:
+        if textboxes:
             self.groups = self.group_textboxes(laparams, textboxes)
             assigner = IndexAssigner()
             for group in self.groups:
                 group.analyze(laparams)
                 assigner.run(group)
             textboxes.sort(key=lambda box: box.index)
-        else:
-            def getkey(box):
-                if isinstance(box, LTTextBoxVertical):
-                    return (0, -box.x1, box.y0)
-                else:
-                    return (1, box.y0, box.x0)
-            textboxes.sort(key=getkey)
         self._objs = textboxes + otherobjs + empties
         return
 

@@ -1,5 +1,4 @@
-#!c:\program files (x86)\microsoft visual studio\shared\python36_64\python.exe
-
+#!/Users/chris/Projects/chris/various/pdfminer/venv/bin/python
 #
 #  latin2ascii.py - converts latin1 characters into ascii.
 #

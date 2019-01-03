@@ -1,18 +1,16 @@
-
+#!/usr/bin/env python
 import logging
 from io import BytesIO
 from .psparser import PSStackParser
 from .psparser import PSSyntaxError
 from .psparser import PSEOF
 from .psparser import KWD
-from . import settings
+from .settings import STRICT
 from .pdftypes import PDFException
 from .pdftypes import PDFStream
 from .pdftypes import PDFObjRef
 from .pdftypes import int_value
 from .pdftypes import dict_value
-
-log = logging.getLogger(__name__)
 
 
 ##  Exceptions
@@ -91,24 +89,24 @@ class PDFParser(PSStackParser):
                 try:
                     objlen = int_value(dic['Length'])
                 except KeyError:
-                    if settings.STRICT:
+                    if STRICT:
                         raise PDFSyntaxError('/Length is undefined: %r' % dic)
             self.seek(pos)
             try:
                 (_, line) = self.nextline()  # 'stream'
             except PSEOF:
-                if settings.STRICT:
+                if STRICT:
                     raise PDFSyntaxError('Unexpected EOF')
                 return
             pos += len(line)
             self.fp.seek(pos)
-            data = bytearray(self.fp.read(objlen))
+            data = self.fp.read(objlen)
             self.seek(pos+objlen)
             while 1:
                 try:
                     (linepos, line) = self.nextline()
                 except PSEOF:
-                    if settings.STRICT:
+                    if STRICT:
                         raise PDFSyntaxError('Unexpected EOF')
                     break
                 if b'endstream' in line:
@@ -120,10 +118,9 @@ class PDFParser(PSStackParser):
                 objlen += len(line)
                 if self.fallback:
                     data += line
-            data = bytes(data)
             self.seek(pos+objlen)
             # XXX limit objlen not to exceed object boundary
-            log.debug('Stream: pos=%d, objlen=%d, dic=%r, data=%r...', pos, objlen, dic, data[:10])
+            logging.debug('Stream: pos=%d, objlen=%d, dic=%r, data=%r...', pos, objlen, dic, data[:10])
             obj = PDFStream(dic, data, self.doc.decipher)
             self.push((pos, obj))
 
@@ -167,7 +164,7 @@ class PDFStreamParser(PDFParser):
                 pass
             return
         elif token in (self.KEYWORD_OBJ, self.KEYWORD_ENDOBJ):
-            if settings.STRICT:
+            if STRICT:
                 # See PDF Spec 3.4.6: Only the object values are stored in the
                 # stream; the obj and endobj keywords are not used.
                 raise PDFSyntaxError('Keyword endobj found in stream')

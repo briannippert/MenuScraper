@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import logging
 import re
@@ -23,10 +23,7 @@ from .utils import enc
 from .utils import bbox2str
 from . import utils
 
-import six  # Python 2+3 compatibility
-
-log = logging.getLogger(__name__)
-
+import six # Python 2+3 compatibility
 
 ##  PDFLayoutAnalyzer
 ##
@@ -48,8 +45,8 @@ class PDFLayoutAnalyzer(PDFTextDevice):
         return
 
     def end_page(self, page):
-        assert not self._stack, str(len(self._stack))
-        assert isinstance(self.cur_item, LTPage), str(type(self.cur_item))
+        assert not self._stack
+        assert isinstance(self.cur_item, LTPage)
         if self.laparams is not None:
             self.cur_item.analyze(self.laparams)
         self.pageno += 1
@@ -63,13 +60,13 @@ class PDFLayoutAnalyzer(PDFTextDevice):
 
     def end_figure(self, _):
         fig = self.cur_item
-        assert isinstance(self.cur_item, LTFigure), str(type(self.cur_item))
+        assert isinstance(self.cur_item, LTFigure)
         self.cur_item = self._stack.pop()
         self.cur_item.add(fig)
         return
 
     def render_image(self, name, stream):
-        assert isinstance(self.cur_item, LTFigure), str(type(self.cur_item))
+        assert isinstance(self.cur_item, LTFigure)
         item = LTImage(name, stream,
                        (self.cur_item.x0, self.cur_item.y0,
                         self.cur_item.x1, self.cur_item.y1))
@@ -85,8 +82,7 @@ class PDFLayoutAnalyzer(PDFTextDevice):
             (x0, y0) = apply_matrix_pt(self.ctm, (x0, y0))
             (x1, y1) = apply_matrix_pt(self.ctm, (x1, y1))
             if x0 == x1 or y0 == y1:
-                self.cur_item.add(LTLine(gstate.linewidth, (x0, y0), (x1, y1),
-                    stroke, fill, evenodd, gstate.scolor, gstate.ncolor))
+                self.cur_item.add(LTLine(gstate.linewidth, (x0, y0), (x1, y1)))
                 return
         if shape == 'mlllh':
             # rectangle
@@ -100,32 +96,30 @@ class PDFLayoutAnalyzer(PDFTextDevice):
             (x3, y3) = apply_matrix_pt(self.ctm, (x3, y3))
             if ((x0 == x1 and y1 == y2 and x2 == x3 and y3 == y0) or
                 (y0 == y1 and x1 == x2 and y2 == y3 and x3 == x0)):
-                self.cur_item.add(LTRect(gstate.linewidth, (x0, y0, x2, y2),
-                    stroke, fill, evenodd, gstate.scolor, gstate.ncolor))
+                self.cur_item.add(LTRect(gstate.linewidth, (x0, y0, x2, y2)))
                 return
         # other shapes
         pts = []
         for p in path:
             for i in range(1, len(p), 2):
                 pts.append(apply_matrix_pt(self.ctm, (p[i], p[i+1])))
-        self.cur_item.add(LTCurve(gstate.linewidth, pts, stroke, fill,
-            evenodd, gstate.scolor, gstate.ncolor))
+        self.cur_item.add(LTCurve(gstate.linewidth, pts))
         return
 
-    def render_char(self, matrix, font, fontsize, scaling, rise, cid, ncs, graphicstate):
+    def render_char(self, matrix, font, fontsize, scaling, rise, cid):
         try:
             text = font.to_unichr(cid)
-            assert isinstance(text, six.text_type), str(type(text))
+            assert isinstance(text, six.text_type), text
         except PDFUnicodeNotDefined:
             text = self.handle_undefined_char(font, cid)
         textwidth = font.char_width(cid)
         textdisp = font.char_disp(cid)
-        item = LTChar(matrix, font, fontsize, scaling, rise, text, textwidth, textdisp, ncs, graphicstate)
+        item = LTChar(matrix, font, fontsize, scaling, rise, text, textwidth, textdisp)
         self.cur_item.add(item)
         return item.adv
 
     def handle_undefined_char(self, font, cid):
-        log.info('undefined: %r, %r', font, cid)
+        logging.info('undefined: %r, %r', font, cid)
         return '(cid:%d)' % cid
 
     def receive_layout(self, ltpage):
@@ -214,7 +208,7 @@ class TextConverter(PDFConverter):
         return
 
     # Some dummy functions to save memory/CPU when all that is wanted
-    # is text.  This stops all the image and drawing output from being
+    # is text.  This stops all the image and drawing ouput from being
     # recorded and taking up RAM.
     def render_image(self, name, stream):
         if self.imagewriter is None:
@@ -349,7 +343,7 @@ class HTMLConverter(PDFConverter):
             if self._font is not None:
                 self.write('</span>')
             self.write('<span style="font-family: %s; font-size:%dpx">' %
-                       (enc(fontname), fontsize * self.scale * self.fontscale))
+                       (fontname, fontsize * self.scale * self.fontscale))
             self._font = font
         self.write_text(text)
         return
@@ -520,9 +514,8 @@ class XMLConverter(PDFConverter):
                     render(child)
                 self.write('</textbox>\n')
             elif isinstance(item, LTChar):
-                self.write('<text font="%s" bbox="%s" colourspace="%s" ncolour="%s" size="%.3f">' %
-                           (enc(item.fontname, None), bbox2str(item.bbox),
-                            item.ncs.name, item.graphicstate.ncolor, item.size))
+                self.write('<text font="%s" bbox="%s" size="%.3f">' %
+                                 (enc(item.fontname, None), bbox2str(item.bbox), item.size))
                 self.write_text(item.get_text())
                 self.write('</text>\n')
             elif isinstance(item, LTText):
@@ -536,7 +529,7 @@ class XMLConverter(PDFConverter):
                     self.write('<image width="%d" height="%d" />\n' %
                                      (item.width, item.height))
             else:
-                assert False, str(('Unhandled', item))
+                assert 0, item
             return
         render(ltpage)
         return

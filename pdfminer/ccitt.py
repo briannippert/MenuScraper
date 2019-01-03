@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # CCITT Fax decoder
 #
 # Bugs: uncompressed mode untested.
@@ -13,17 +13,7 @@
 import sys
 import array
 
-import six  #Python 2+3 compatibility
-
-if six.PY3:
-    def get_bytes(data):
-        for byte in data:
-            yield byte
-else:
-    def get_bytes(data):
-        for char in data:
-            yield ord(char)
-
+import six #Python 2+3 compatibility
 
 ##  BitParser
 ##
@@ -50,9 +40,10 @@ class BitParser(object):
         return
 
     def feedbytes(self, data):
-        for byte in get_bytes(data):
+        for c in data:
+            b = ord(c)
             for m in (128, 64, 32, 16, 8, 4, 2, 1):
-                self._parse_bit(byte & m)
+                self._parse_bit(b & m)
         return
 
     def _parse_bit(self, x):
@@ -337,10 +328,11 @@ class CCITTG4Parser(BitParser):
         return
 
     def feedbytes(self, data):
-        for byte in get_bytes(data):
+        for c in data:
+            b = ord(c)
             try:
                 for m in (128, 64, 32, 16, 8, 4, 2, 1):
-                    self._parse_bit(byte & m)
+                    self._parse_bit(b & m)
             except self.ByteSkip:
                 self._accept = self._parse_mode
                 self._state = self.MODE
@@ -576,7 +568,6 @@ def ccittfaxdecode(data, params):
 # test
 def main(argv):
     if not argv[1:]:
-        import unittest
         return unittest.main()
 
     class Parser(CCITTG4Parser):
@@ -599,7 +590,7 @@ def main(argv):
             pygame.image.save(self.img, 'out.bmp')
             return
     for path in argv[1:]:
-        fp = open(path, 'rb')
+        fp = file(path, 'rb')
         (_, _, k, w, h, _) = path.split('.')
         parser = Parser(int(w))
         parser.feedbytes(fp.read())

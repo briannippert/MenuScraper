@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 import re
 import logging
 from io import BytesIO
@@ -12,7 +12,7 @@ from .psparser import keyword_name
 from .psparser import PSStackParser
 from .psparser import LIT
 from .psparser import KWD
-from . import settings
+from .settings import STRICT
 from .pdftypes import PDFException
 from .pdftypes import PDFStream
 from .pdftypes import PDFObjRef
@@ -31,9 +31,7 @@ from .utils import choplist
 from .utils import mult_matrix
 from .utils import MATRIX_IDENTITY
 
-import six  # Python 2+3 compatibility
-
-log = logging.getLogger(__name__)
+import six # Python 2+3 compatibility
 
 ##  Exceptions
 ##
@@ -109,12 +107,6 @@ class PDFGraphicState(object):
         self.dash = None
         self.intent = None
         self.flatness = None
-
-        # stroking color
-        self.scolor = None
-
-        # non stroking color
-        self.ncolor = None
         return
 
     def copy(self):
@@ -126,17 +118,13 @@ class PDFGraphicState(object):
         obj.dash = self.dash
         obj.intent = self.intent
         obj.flatness = self.flatness
-        obj.scolor = self.scolor
-        obj.ncolor = self.ncolor
         return obj
 
     def __repr__(self):
         return ('<PDFGraphicState: linewidth=%r, linecap=%r, linejoin=%r, '
-                ' miterlimit=%r, dash=%r, intent=%r, flatness=%r, '
-                ' stroking color=%r, non stroking color=%r>' %
+                ' miterlimit=%r, dash=%r, intent=%r, flatness=%r>' %
                 (self.linewidth, self.linecap, self.linejoin,
-                 self.miterlimit, self.dash, self.intent, self.flatness,
-                 self.scolor, self.ncolor))
+                 self.miterlimit, self.dash, self.intent, self.flatness))
 
 
 ##  Resource Manager
@@ -178,15 +166,15 @@ class PDFResourceManager(object):
         if objid and objid in self._cached_fonts:
             font = self._cached_fonts[objid]
         else:
-            log.info('get_font: create: objid=%r, spec=%r', objid, spec)
-            if settings.STRICT:
+            logging.info('get_font: create: objid=%r, spec=%r', objid, spec)
+            if STRICT:
                 if spec['Type'] is not LITERAL_FONT:
                     raise PDFFontError('Type is not /Font')
             # Create a Font object.
             if 'Subtype' in spec:
                 subtype = literal_name(spec['Subtype'])
             else:
-                if settings.STRICT:
+                if STRICT:
                     raise PDFFontError('Font Subtype is not specified.')
                 subtype = 'Type1'
             if subtype in ('Type1', 'MMType1'):
@@ -211,7 +199,7 @@ class PDFResourceManager(object):
                         subspec[k] = resolve1(spec[k])
                 font = self.get_font(None, subspec)
             else:
-                if settings.STRICT:
+                if STRICT:
                     raise PDFFontError('Invalid Font spec: %r' % spec)
                 font = PDFType1Font(self, spec)  # this is so wrong!
             if objid and self.caching:
@@ -270,7 +258,7 @@ class PDFContentParser(PSStackParser):
                 self.charpos += 1
                 if len(target) <= i and c.isspace():
                     i += 1
-                elif i < len(target) and c == (six.int2byte(target[i]) if six.PY3 else target[i]):
+                elif i < len(target) and c == target[i]:
                     i += 1
                 else:
                     i = 0
@@ -311,7 +299,7 @@ class PDFContentParser(PSStackParser):
                 self.push((pos, obj))
                 self.push((pos, self.KEYWORD_EI))
             except PSTypeError:
-                if settings.STRICT:
+                if STRICT:
                     raise
         else:
             self.push((pos, token))
@@ -352,7 +340,7 @@ class PDFPageInterpreter(object):
             else:
                 return PREDEFINED_COLORSPACE.get(name)
         for (k, v) in six.iteritems(dict_value(resources)):
-            log.debug('Resource: %r: %r', k, v)
+            logging.debug('Resource: %r: %r', k, v)
             if k == 'Font':
                 for (fontid, spec) in six.iteritems(dict_value(v)):
                     objid = None
@@ -571,7 +559,7 @@ class PDFPageInterpreter(object):
         try:
             self.scs = self.csmap[literal_name(name)]
         except KeyError:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFInterpreterError('Undefined ColorSpace: %r' % name)
         return
 
@@ -580,43 +568,37 @@ class PDFPageInterpreter(object):
         try:
             self.ncs = self.csmap[literal_name(name)]
         except KeyError:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFInterpreterError('Undefined ColorSpace: %r' % name)
         return
 
     # setgray-stroking
     def do_G(self, gray):
-        self.graphicstate.scolor = gray
         #self.do_CS(LITERAL_DEVICE_GRAY)
         return
 
     # setgray-non-stroking
     def do_g(self, gray):
-        self.graphicstate.ncolor = gray
         #self.do_cs(LITERAL_DEVICE_GRAY)
         return
 
     # setrgb-stroking
     def do_RG(self, r, g, b):
-        self.graphicstate.color = (r, g, b)
         #self.do_CS(LITERAL_DEVICE_RGB)
         return
 
     # setrgb-non-stroking
     def do_rg(self, r, g, b):
-        self.graphicstate.color = (r, g, b)
         #self.do_cs(LITERAL_DEVICE_RGB)
         return
 
     # setcmyk-stroking
     def do_K(self, c, m, y, k):
-        self.graphicstate.color = (c, m, y, k)
         #self.do_CS(LITERAL_DEVICE_CMYK)
         return
 
     # setcmyk-non-stroking
     def do_k(self, c, m, y, k):
-        self.graphicstate.color = (c, m, y, k)
         #self.do_cs(LITERAL_DEVICE_CMYK)
         return
 
@@ -625,20 +607,20 @@ class PDFPageInterpreter(object):
         if self.scs:
             n = self.scs.ncomponents
         else:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFInterpreterError('No colorspace specified!')
             n = 1
-        self.graphicstate.scolor = self.pop(n)
+        self.pop(n)
         return
 
     def do_scn(self):
         if self.ncs:
             n = self.ncs.ncomponents
         else:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFInterpreterError('No colorspace specified!')
             n = 1
-        self.graphicstate.ncolor = self.pop(n)
+        self.pop(n)
         return
 
     def do_SC(self):
@@ -716,7 +698,7 @@ class PDFPageInterpreter(object):
         try:
             self.textstate.font = self.fontmap[literal_name(fontid)]
         except KeyError:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFInterpreterError('Undefined Font id: %r' % fontid)
             self.textstate.font = self.rsrcmgr.get_font(None, {})
         self.textstate.fontsize = fontsize
@@ -766,10 +748,10 @@ class PDFPageInterpreter(object):
     def do_TJ(self, seq):
         #print >>sys.stderr, 'TJ(%r): %r' % (seq, self.textstate)
         if self.textstate.font is None:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFInterpreterError('No font specified!')
             return
-        self.device.render_string(self.textstate, seq, self.ncs, self.graphicstate.copy())
+        self.device.render_string(self.textstate, seq)
         return
 
     # show
@@ -811,10 +793,10 @@ class PDFPageInterpreter(object):
         try:
             xobj = stream_value(self.xobjmap[xobjid])
         except KeyError:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFInterpreterError('Undefined xobject id: %r' % xobjid)
             return
-        log.info('Processing xobj: %r', xobj)
+        logging.info('Processing xobj: %r', xobj)
         subtype = xobj.get('Subtype')
         if subtype is LITERAL_FORM and 'BBox' in xobj:
             interpreter = self.dup()
@@ -838,7 +820,7 @@ class PDFPageInterpreter(object):
         return
 
     def process_page(self, page):
-        log.info('Processing page: %r', page)
+        logging.info('Processing page: %r', page)
         (x0, y0, x1, y1) = page.mediabox
         if page.rotate == 90:
             ctm = (0, -1, 1, 0, -y0, x1)
@@ -857,8 +839,8 @@ class PDFPageInterpreter(object):
     #   Render the content streams.
     #   This method may be called recursively.
     def render_contents(self, resources, streams, ctm=MATRIX_IDENTITY):
-        log.info('render_contents: resources=%r, streams=%r, ctm=%r',
-                 resources, streams, ctm)
+        logging.info('render_contents: resources=%r, streams=%r, ctm=%r',
+                     resources, streams, ctm)
         self.init_resources(resources)
         self.init_state(ctm)
         self.execute(list_value(streams))
@@ -883,14 +865,14 @@ class PDFPageInterpreter(object):
                     nargs = six.get_function_code(func).co_argcount-1
                     if nargs:
                         args = self.pop(nargs)
-                        log.debug('exec: %s %r', name, args)
+                        logging.debug('exec: %s %r', name, args)
                         if len(args) == nargs:
                             func(*args)
                     else:
-                        log.debug('exec: %s', name)
+                        logging.debug('exec: %s', name)
                         func()
                 else:
-                    if settings.STRICT:
+                    if STRICT:
                         raise PDFInterpreterError('Unknown operator: %r' % name)
             else:
                 self.push(obj)

@@ -1,5 +1,4 @@
-#!c:\program files (x86)\microsoft visual studio\shared\python36_64\python.exe
-
+#!/Users/chris/Projects/chris/various/pdfminer/venv/bin/python
 #
 # dumppdf.py - dump pdf contents in XML format.
 #
@@ -122,7 +121,7 @@ def dumpoutline(outfp, fname, objids, pagenos, password='',
     parser = PDFParser(fp)
     doc = PDFDocument(parser, password)
     pages = dict( (page.pageid, pageno) for (pageno,page)
-                  in enumerate(PDFPage.create_pages(doc), 1) )
+                  in enumerate(PDFPage.create_pages(doc)) )
     def resolve_dest(dest):
         if isinstance(dest, str):
             dest = resolve1(doc.get_dest(dest))
@@ -130,8 +129,6 @@ def dumpoutline(outfp, fname, objids, pagenos, password='',
             dest = resolve1(doc.get_dest(dest.name))
         if isinstance(dest, dict):
             dest = dest['D']
-        if isinstance(dest, PDFObjRef):
-            dest = dest.resolve()
         return dest
     try:
         outlines = doc.get_outlines()
@@ -142,10 +139,10 @@ def dumpoutline(outfp, fname, objids, pagenos, password='',
                 dest = resolve_dest(dest)
                 pageno = pages[dest[0].objid]
             elif a:
-                action = a
+                action = a.resolve()
                 if isinstance(action, dict):
                     subtype = action.get('S')
-                    if subtype and repr(subtype) == '/\'GoTo\'' and action.get('D'):
+                    if subtype and repr(subtype) == '/GoTo' and action.get('D'):
                         dest = resolve_dest(action['D'])
                         pageno = pages[dest[0].objid]
             s = e(title).encode('utf-8', 'xmlcharrefreplace')

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Functions that encapsulate "usual" use-cases for pdfminer, for use making
@@ -81,4 +82,3 @@ def extract_text_to_fp(inf, outfp,
         page.rotate = (page.rotate + rotation) % 360
         interpreter.process_page(page)    
 
-    device.close()

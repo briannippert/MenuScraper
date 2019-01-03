@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 import sys
 import struct
 from io import BytesIO
@@ -12,7 +12,7 @@ from .psparser import PSStackParser
 from .psparser import PSEOF
 from .psparser import LIT
 from .psparser import KWD
-from . import settings
+from .settings import STRICT
 from .psparser import PSLiteral
 from .psparser import literal_name
 from .pdftypes import PDFException
@@ -357,7 +357,7 @@ class CFFFont(object):
                     sid += 1
         elif format == b'\x02':
             # Format 2
-            assert False, str(('Unhandled', format))
+            assert 0
         else:
             raise ValueError('unsupported charset format: %r' % format)
         #print self.code2gid
@@ -383,16 +383,10 @@ class TrueTypeFont(object):
         self.fp = fp
         self.tables = {}
         self.fonttype = fp.read(4)
-        try:
-            (ntables, _1, _2, _3) = struct.unpack('>HHHH', fp.read(8))
-            for _ in range(ntables):
-                (name, tsum, offset, length) = struct.unpack('>4sLLL', fp.read(16))
-                self.tables[name] = (offset, length)
-        except struct.error:
-            # Do not fail if there are not enough bytes to read. Even for
-            # corrupted PDFs we would like to get as much information as
-            # possible, so continue.
-            pass
+        (ntables, _1, _2, _3) = struct.unpack('>HHHH', fp.read(8))
+        for _ in range(ntables):
+            (name, tsum, offset, length) = struct.unpack('>4sLLL', fp.read(16))
+            self.tables[name] = (offset, length)
         return
 
     def create_unicode_map(self):
@@ -450,7 +444,7 @@ class TrueTypeFont(object):
                         for c in range(sc, ec+1):
                             char2gid[c] = (c + idd) & 0xffff
             else:
-                assert False, str(('Unhandled', fmttype))
+                assert 0
         # create unicode map
         unicode_map = FileUnicodeMap()
         for (char, gid) in char2gid.iteritems():
@@ -500,7 +494,7 @@ class PDFFont(object):
         return False
 
     def decode(self, bytes):
-        return bytearray(bytes)  # map(ord, bytes)
+        return [six.indexbytes(bytes, i) for i,_ in enumerate(bytes)] # map(ord, bytes)
 
     def get_ascent(self):
         return self.ascent * self.vscale
@@ -549,7 +543,7 @@ class PDFSimpleFont(PDFFont):
             encoding = LITERAL_STANDARD_ENCODING
         if isinstance(encoding, dict):
             name = literal_name(encoding.get('BaseEncoding', LITERAL_STANDARD_ENCODING))
-            diff = list_value(encoding.get('Differences', []))
+            diff = list_value(encoding.get('Differences', None))
             self.cid2unicode = EncodingDB.get_encoding(name, diff)
         else:
             self.cid2unicode = EncodingDB.get_encoding(literal_name(encoding))
@@ -580,7 +574,7 @@ class PDFType1Font(PDFSimpleFont):
         try:
             self.basefont = literal_name(spec['BaseFont'])
         except KeyError:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFFontError('BaseFont is missing')
             self.basefont = 'unknown'
         try:
@@ -638,32 +632,32 @@ class PDFType3Font(PDFSimpleFont):
 # PDFCIDFont
 class PDFCIDFont(PDFFont):
 
-    def __init__(self, rsrcmgr, spec, strict=settings.STRICT):
+    def __init__(self, rsrcmgr, spec, STRICT=False):
         try:
             self.basefont = literal_name(spec['BaseFont'])
         except KeyError:
-            if strict:
+            if STRICT:
                 raise PDFFontError('BaseFont is missing')
             self.basefont = 'unknown'
         self.cidsysteminfo = dict_value(spec.get('CIDSystemInfo', {}))
-        self.cidcoding = '%s-%s' % (resolve1(self.cidsysteminfo.get('Registry', b'unknown')).decode("latin1"),
-                                    resolve1(self.cidsysteminfo.get('Ordering', b'unknown')).decode("latin1"))
+        self.cidcoding = '%s-%s' % (self.cidsysteminfo.get('Registry', b'unknown').decode("latin1"),
+                                    self.cidsysteminfo.get('Ordering', b'unknown').decode("latin1"))
         try:
             name = literal_name(spec['Encoding'])
         except KeyError:
-            if strict:
+            if STRICT:
                 raise PDFFontError('Encoding is unspecified')
             name = 'unknown'
         try:
             self.cmap = CMapDB.get_cmap(name)
         except CMapDB.CMapNotFound as e:
-            if strict:
+            if STRICT:
                 raise PDFFontError(e)
             self.cmap = CMap()
         try:
             descriptor = dict_value(spec['FontDescriptor'])
         except KeyError:
-            if strict:
+            if STRICT:
                 raise PDFFontError('FontDescriptor is missing')
             descriptor = {}
         ttf = None

@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 import re
 import struct
 import logging
@@ -19,7 +19,7 @@ from .psparser import PSEOF
 from .psparser import literal_name
 from .psparser import LIT
 from .psparser import KWD
-from . import settings
+from .settings import STRICT
 from .pdftypes import PDFException
 from .pdftypes import PDFTypeError
 from .pdftypes import PDFStream
@@ -36,8 +36,6 @@ from .utils import choplist
 from .utils import nunpack
 from .utils import decode_text
 
-
-log = logging.getLogger(__name__)
 
 ##  Exceptions
 ##
@@ -129,14 +127,14 @@ class PDFXRef(PDFBaseXRef):
                 if use != b'n':
                     continue
                 self.offsets[objid] = (None, long(pos) if six.PY2 else int(pos), int(genno))
-        log.info('xref objects: %r', self.offsets)
+        logging.info('xref objects: %r', self.offsets)
         self.load_trailer(parser)
         return
 
     def load_trailer(self, parser):
         try:
             (_, kwd) = parser.nexttoken()
-            assert kwd is KWD(b'trailer'), str(kwd)
+            assert kwd is KWD(b'trailer')
             (_, dic) = parser.nextobject()
         except PSEOF:
             x = parser.pop(1)
@@ -144,7 +142,7 @@ class PDFXRef(PDFBaseXRef):
                 raise PDFNoValidXRef('Unexpected EOF - file corrupted')
             (_, dic) = x[0]
         self.trailer.update(dict_value(dic))
-        log.debug('trailer=%r', self.trailer)
+        logging.debug('trailer=%r', self.trailer)
         return
 
     def get_trailer(self):
@@ -179,7 +177,7 @@ class PDFXRefFallback(PDFXRef):
             if line.startswith(b'trailer'):
                 parser.seek(pos)
                 self.load_trailer(parser)
-                log.info('trailer: %r', self.trailer)
+                logging.info('trailer: %r', self.trailer)
                 break
             if six.PY3:
                 line=line.decode('latin-1') #default pdf encoding
@@ -198,7 +196,7 @@ class PDFXRefFallback(PDFXRef):
                 try:
                     n = stream['N']
                 except KeyError:
-                    if settings.STRICT:
+                    if STRICT:
                         raise PDFSyntaxError('N is not defined: %r' % stream)
                     n = 0
                 parser1 = PDFStreamParser(stream.get_data())
@@ -246,9 +244,9 @@ class PDFXRefStream(PDFBaseXRef):
         self.data = stream.get_data()
         self.entlen = self.fl1+self.fl2+self.fl3
         self.trailer = stream.attrs
-        log.info('xref stream: objid=%s, fields=%d,%d,%d',
-                 ', '.join(map(repr, self.ranges)),
-                 self.fl1, self.fl2, self.fl3)
+        logging.info('xref stream: objid=%s, fields=%d,%d,%d',
+                     ', '.join(map(repr, self.ranges)),
+                      self.fl1, self.fl2, self.fl3)
         return
 
     def get_trailer(self):
@@ -571,7 +569,7 @@ class PDFDocument(object):
                 continue
             # If there's an encryption info, remember it.
             if 'Encrypt' in trailer:
-                #assert not self.encryption, str(self.encryption)
+                #assert not self.encryption
                 self.encryption = (list_value(trailer['ID']),
                                    dict_value(trailer['Encrypt']))
                 self._initialize_password(password)
@@ -584,11 +582,9 @@ class PDFDocument(object):
         else:
             raise PDFSyntaxError('No /Root object! - Is this really a PDF?')
         if self.catalog.get('Type') is not LITERAL_CATALOG:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFSyntaxError('Catalog not found!')
         return
-    
-    KEYWORD_OBJ = KWD(b'obj')
 
     # _initialize_password(password=b'')
     #   Perform the initialization with a given password.
@@ -624,12 +620,12 @@ class PDFDocument(object):
 
     def _get_objects(self, stream):
         if stream.get('Type') is not LITERAL_OBJSTM:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFSyntaxError('Not a stream object: %r' % stream)
         try:
             n = stream['N']
         except KeyError:
-            if settings.STRICT:
+            if STRICT:
                 raise PDFSyntaxError('N is not defined: %r' % stream)
             n = 0
         parser = PDFStreamParser(stream.get_data())
@@ -646,24 +642,10 @@ class PDFDocument(object):
     def _getobj_parse(self, pos, objid):
         self._parser.seek(pos)
         (_, objid1) = self._parser.nexttoken()  # objid
-        (_, genno) = self._parser.nexttoken()  # genno
-        (_, kwd) = self._parser.nexttoken()
-        # #### hack around malformed pdf files
-        # copied from https://github.com/jaepil/pdfminer3k/blob/master/pdfminer/pdfparser.py#L399
-        #to solve https://github.com/pdfminer/pdfminer.six/issues/56
-        #assert objid1 == objid, str((objid1, objid))
-        if objid1 != objid:
-            x = []
-            while kwd is not self.KEYWORD_OBJ:
-                (_,kwd) = self._parser.nexttoken()
-                x.append(kwd)
-            if x:
-                objid1 = x[-2]
-                genno = x[-1]
-        # #### end hack around malformed pdf files
         if objid1 != objid:
             raise PDFSyntaxError('objid mismatch: %r=%r' % (objid1, objid))
-
+        (_, genno) = self._parser.nexttoken()  # genno
+        (_, kwd) = self._parser.nexttoken()
         if kwd != KWD(b'obj'):
             raise PDFSyntaxError('Invalid object spec: offset=%r' % pos)
         (_, obj) = self._parser.nextobject()
@@ -674,7 +656,7 @@ class PDFDocument(object):
         assert objid != 0
         if not self.xrefs:
             raise PDFException('PDFDocument is not initialized')
-        log.debug('getobj: objid=%r', objid)
+        logging.debug('getobj: objid=%r', objid)
         if objid in self._cached_objs:
             (obj, genno) = self._cached_objs[objid]
         else:
@@ -699,7 +681,7 @@ class PDFDocument(object):
                     continue
             else:
                 raise PDFObjectNotFound(objid)
-            log.debug('register: objid=%r: %r', objid, obj)
+            logging.debug('register: objid=%r: %r', objid, obj)
             if self.caching:
                 self._cached_objs[objid] = (obj, genno)
         return obj
@@ -772,14 +754,14 @@ class PDFDocument(object):
         prev = None
         for line in parser.revreadlines():
             line = line.strip()
-            log.debug('find_xref: %r', line)
+            logging.debug('find_xref: %r', line)
             if line == b'startxref':
                 break
             if line:
                 prev = line
         else:
             raise PDFNoValidXRef('Unexpected EOF')
-        log.info('xref found: pos=%r', prev)
+        logging.info('xref found: pos=%r', prev)
         return long(prev) if six.PY2 else int(prev)
 
     # read xref table
@@ -791,7 +773,7 @@ class PDFDocument(object):
             (pos, token) = parser.nexttoken()
         except PSEOF:
             raise PDFNoValidXRef('Unexpected EOF')
-        log.info('read_xref_from: start=%d, token=%r', start, token)
+        logging.info('read_xref_from: start=%d, token=%r', start, token)
         if isinstance(token, int):
             # XRefStream: PDF-1.5
             parser.seek(pos)
@@ -805,7 +787,7 @@ class PDFDocument(object):
             xref.load(parser)
         xrefs.append(xref)
         trailer = xref.get_trailer()
-        log.info('trailer: %r', trailer)
+        logging.info('trailer: %r', trailer)
         if 'XRefStm' in trailer:
             pos = int_value(trailer['XRefStm'])
             self.read_xref_from(parser, pos, xrefs)

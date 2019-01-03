@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 """
 Miscellaneous Routines.
 """
@@ -15,7 +15,7 @@ if six.PY3:
 
 def make_compat_bytes(in_str):
     "In Py2, does nothing. In Py3, converts to bytes, encoding to unicode."
-    assert isinstance(in_str, str), str(type(in_str))
+    assert isinstance(in_str, str)
     if six.PY2:
         return in_str
     else:
@@ -23,7 +23,7 @@ def make_compat_bytes(in_str):
 
 def make_compat_str(in_str):
     "In Py2, does nothing. In Py3, converts to string, guessing encoding."
-    assert isinstance(in_str, (bytes, str, unicode)), str(type(in_str))
+    assert isinstance(in_str, (bytes, str, unicode))
     if six.PY3 and isinstance(in_str, bytes):
         enc = chardet.detect(in_str)
         in_str = in_str.decode(enc['encoding'])
@@ -32,11 +32,13 @@ def make_compat_str(in_str):
 def compatible_encode_method(bytesorstring, encoding='utf-8', erraction='ignore'):
     "When Py2 str.encode is called, it often means bytes.encode in Py3. This does either."
     if six.PY2:
-        assert isinstance(bytesorstring, (str, unicode)), str(type(bytesorstring))
+        assert isinstance(bytesorstring, (str, unicode)), ("Error: Assumed was calling"
+            " encode() on a string in Py2: {}").format(type(bytesorstring))
         return bytesorstring.encode(encoding, erraction)
     if six.PY3:
         if isinstance(bytesorstring, str): return bytesorstring
-        assert isinstance(bytesorstring, bytes), str(type(bytesorstring))
+        assert isinstance(bytesorstring, bytes), ("Error: Assumed was calling"
+            " encode() on a bytes in Py3: {}").format(type(bytesorstring))
         return bytesorstring.decode(encoding, erraction)
 
 ##  PNG Predictor
@@ -44,9 +46,8 @@ def compatible_encode_method(bytesorstring, encoding='utf-8', erraction='ignore'
 def apply_png_predictor(pred, colors, columns, bitspercomponent, data):
     if bitspercomponent != 8:
         # unsupported
-        raise ValueError("Unsupported `bitspercomponent': %d" %
-                         bitspercomponent)
-    nbytes = colors * columns * bitspercomponent // 8
+        raise ValueError(bitspercomponent)
+    nbytes = colors*columns*bitspercomponent//8
     i = 0
     buf = b''
     line0 = b'\x00' * columns
@@ -85,7 +86,7 @@ def apply_png_predictor(pred, colors, columns, bitspercomponent, data):
                 line2 += six.int2byte(c)
         else:
             # unsupported
-            raise ValueError("Unsupported predictor value: %d" % ft)
+            raise ValueError(ft)
         buf += line2
         line0 = line2
     return buf
@@ -145,6 +146,13 @@ def uniq(objs):
     return
 
 
+# csort
+def csort(objs, key):
+    """Order-preserving sorting function."""
+    idxs = dict((obj, i) for (i, obj) in enumerate(objs))
+    return sorted(objs, key=lambda obj: (key(obj), idxs[obj]))
+
+
 # fsplit
 def fsplit(pred, objs):
     """Split a list into two classes according to the predicate."""
@@ -161,7 +169,7 @@ def fsplit(pred, objs):
 # drange
 def drange(v0, v1, d):
     """Returns a discrete range."""
-    assert v0 < v1, str((v0, v1, d))
+    assert v0 < v1
     return range(int(v0)//d, int(v1+d)//d)
 
 
@@ -202,7 +210,7 @@ def choplist(n, seq):
 
 # nunpack
 def nunpack(s, default=0):
-    """Unpacks 1 to 4 or 8 byte integers (big endian)."""
+    """Unpacks 1 to 4 byte integers (big endian)."""
     l = len(s)
     if not l:
         return default
@@ -214,8 +222,6 @@ def nunpack(s, default=0):
         return struct.unpack('>L', b'\x00'+s)[0]
     elif l == 4:
         return struct.unpack('>L', s)[0]
-    elif l == 8:
-        return struct.unpack('>Q', s)[0]
     else:
         raise TypeError('invalid length: %d' % l)
 
@@ -262,14 +268,12 @@ def decode_text(s):
     if s.startswith(b'\xfe\xff'):
         return six.text_type(s[2:], 'utf-16be', 'ignore')
     else:
-        return ''.join(PDFDocEncoding[c] for c in s)
+        return ''.join(PDFDocEncoding[ord(c)] for c in s)
 
 
 # enc
 def enc(x, codec='ascii'):
     """Encodes a string for SGML/XML/HTML"""
-    if six.PY3 and isinstance(x, bytes):
-        return ''
     x = x.replace('&', '&amp;').replace('>', '&gt;').replace('<', '&lt;').replace('"', '&quot;')
     if codec:
         x = x.encode(codec, 'xmlcharrefreplace')
@@ -285,28 +289,6 @@ def matrix2str(m):
     (a, b, c, d, e, f) = m
     return '[%.2f,%.2f,%.2f,%.2f, (%.2f,%.2f)]' % (a, b, c, d, e, f)
 
-def vecBetweenBoxes(obj1, obj2):
-    """A distance function between two TextBoxes.
-
-    Consider the bounding rectangle for obj1 and obj2.
-    Return vector between 2 boxes boundaries if they don't overlap, otherwise returns vector betweeen boxes centers
-             +------+..........+ (x1, y1)
-             | obj1 |          :
-             +------+www+------+
-             :          | obj2 |
-    (x0, y0) +..........+------+
-    """
-    (x0, y0) = (min(obj1.x0, obj2.x0), min(obj1.y0, obj2.y0))
-    (x1, y1) = (max(obj1.x1, obj2.x1), max(obj1.y1, obj2.y1))
-    (ow, oh) = (x1-x0, y1-y0)
-    (iw, ih) = (ow-obj1.width-obj2.width, oh-obj1.height-obj2.height)
-    if iw<0 and ih<0:
-        # if one is inside another we compute euclidean distance
-        (xc1, yc1) = ( (obj1.x0+obj1.x1)/2, (obj1.y0+obj1.y1)/2 )
-        (xc2, yc2) = ( (obj2.x0+obj2.x1)/2, (obj2.y0+obj2.y1)/2 )
-        return (xc1-xc2, yc1-yc2)
-    else:
-        return (max(0, iw), max(0, ih))
 
 ##  Plane
 ##
