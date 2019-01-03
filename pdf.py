@@ -10,7 +10,6 @@ from datetime import date
 import calendar
 
 
-
 def convert_pdf_to_txt(path):
     rsrcmgr = PDFResourceManager()
     retstr = io.StringIO()
@@ -23,7 +22,6 @@ def convert_pdf_to_txt(path):
     maxpages = 0
     caching = True
     pagenos = set()
-
     for page in PDFPage.get_pages(fp, pagenos, maxpages=maxpages,
                                   password=password,
                                   caching=caching,
@@ -31,28 +29,25 @@ def convert_pdf_to_txt(path):
         interpreter.process_page(page)
 
     text = retstr.getvalue()
-
     fp.close()
     device.close()
     retstr.close()
     return text
 
 
-urlretrieve("http://corporatecafeboston.com/linked/woburn.pdf", "download.pdf")
-text = convert_pdf_to_txt("download.pdf")
-try:
-    date = sys.argv[1]
-    print(date)
-except:
+def handler(event, context):
+    urlretrieve("http://corporatecafeboston.com/linked/woburn.pdf",
+                "download.pdf")
+    text = convert_pdf_to_txt("download.pdf")
     my_date = date.today()
-    date = calendar.day_name[my_date.weekday()]
-    print(date)
-results = re.findall( r'{0}[\w\W]+?Sandwich:  (.*)?\n'.format(date),text)
-if results:
-    print(results[0])
-else:
-    print("No matches found")
-
-
-
-
+    date = event['currentIntent']['slots']['date']
+    if not date:
+        date = calendar.day_name[my_date.weekday()]
+    results = re.findall(r'{0}[\w\W]+?Sandwich:  (.*)?\n'.format(), text)
+    if results:
+        result = results[0]
+    else:
+        result = "No Food For You"
+    return {
+        'message': result
+    }
